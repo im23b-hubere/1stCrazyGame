@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Runner Game - CrazyGames</title>
+    
+    <!-- CrazyGames SDK -->
+    <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
+    
+    <!-- Phaser from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #game-container {
+            width: 100%;
+            max-width: 800px;
+            height: auto;
+            aspect-ratio: 16/9;
+        }
+        #console-output {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 100px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            font-family: monospace;
+            padding: 10px;
+            overflow-y: auto;
+            display: none;
+        }
+        .loading-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 18px;
+            text-align: center;
+        }
+        .loading-bar-container {
+            position: absolute;
+            top: 60%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+        }
+        .loading-bar {
+            height: 100%;
+            width: 0%;
+            background: #3498db;
+            border-radius: 10px;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div class="loading-message">Loading game...</div>
+        <div class="loading-bar-container">
+            <div class="loading-bar" id="loading-progress"></div>
+        </div>
+        <div id="diagnostic-buttons" style="position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: none;">
+            <button id="fix-game" style="background: #e74c3c; color: white; border: none; padding: 8px 15px; margin: 5px; border-radius: 4px; cursor: pointer;">Fix Game Issues</button>
+            <button id="debug-mode" style="background: #3498db; color: white; border: none; padding: 8px 15px; margin: 5px; border-radius: 4px; cursor: pointer;">Debug Mode</button>
+        </div>
+    </div>
+    <div id="console-output"></div>
+    
+    <script>
+        // Debug console setup - hidden by default, but can be enabled with ?debug=true in URL
+        const consoleOutput = document.getElementById('console-output');
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+        
+        // Check if debug mode is enabled
+        const urlParams = new URLSearchParams(window.location.search);
+        const debugMode = urlParams.get('debug') === 'true';
+        
+        if (debugMode) {
+            // Show console for debugging
+            consoleOutput.style.display = 'block';
+        }
+        
+        console.log = function() {
+            originalConsoleLog.apply(console, arguments);
+            if (debugMode) {
+                const line = document.createElement('div');
+                line.textContent = Array.from(arguments).join(' ');
+                consoleOutput.appendChild(line);
+                consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            }
+        };
+        
+        console.error = function() {
+            originalConsoleError.apply(console, arguments);
+            if (debugMode) {
+                const line = document.createElement('div');
+                line.style.color = '#ff5555';
+                line.textContent = Array.from(arguments).join(' ');
+                consoleOutput.appendChild(line);
+                consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            }
+        };
+        
+        window.onerror = function(message, source, lineno, colno, error) {
+            console.error(`${message} at ${source}:${lineno}:${colno}`);
+            // Show diagnostic buttons when an error occurs
+            setTimeout(() => {
+                const diagnosticButtons = document.getElementById('diagnostic-buttons');
+                if (diagnosticButtons) {
+                    diagnosticButtons.style.display = 'block';
+                    
+                    // Fix Game button
+                    document.getElementById('fix-game').addEventListener('click', function() {
+                        // Apply runtime fixes
+                        try {
+                            // Fix for graphics issues
+                            if (window.Phaser && window.game) {
+                                const scene = window.game.scene.getScene('BootScene') || 
+                                             window.game.scene.getScene('LoadingScene') ||
+                                             window.game.scene.getScene('MainMenuScene');
+                                             
+                                if (scene) {
+                                    // Create simple background textures
+                                    const g = scene.make.graphics();
+                                    
+                                    // Background
+                                    g.fillStyle(0x1e90ff);
+                                    g.fillRect(0, 0, 800, 450);
+                                    g.generateTexture('background', 800, 450);
+                                    
+                                    // Loading background
+                                    g.clear();
+                                    g.fillStyle(0x000000);
+                                    g.fillRect(0, 0, 800, 450); 
+                                    g.generateTexture('loading-background', 800, 450);
+                                    
+                                    g.destroy();
+                                    
+                                    alert('Applied graphics fixes. Reloading game...');
+                                    window.location.reload();
+                                } else {
+                                    alert('Cannot find active scene to apply fix');
+                                }
+                            } else {
+                                alert('Game not initialized yet. Please wait or refresh the page.');
+                            }
+                        } catch (e) {
+                            console.error('Error applying fix:', e);
+                            alert('Could not apply fix: ' + e.message);
+                        }
+                    });
+                    
+                    // Debug Mode button
+                    document.getElementById('debug-mode').addEventListener('click', function() {
+                        window.location.href = 'debug.html';
+                    });
+                }
+            }, 2000);
+            
+            return false;
+        };
+
+        console.log('Game initialization started');
+        
+        // Loading bar progress
+        const loadingBar = document.getElementById('loading-progress');
+        let loadingProgress = 0;
+        
+        // Function to update loading progress
+        function updateLoadingProgress(percent) {
+            loadingProgress = percent;
+            loadingBar.style.width = `${percent}%`;
+        }
+        
+        // Script loading with progress tracking
+        const scripts = [
+            { src: 'assets/placeholder.js', className: 'PlaceholderAssets', required: true },
+            { src: 'scenes/BootScene.js', className: 'BootScene', required: true },
+            { src: 'scenes/LoadingScene.js', className: 'LoadingScene', required: true },
+            { src: 'scenes/MainMenuScene.js', className: 'MainMenuScene', required: true },
+            { src: 'scenes/GameScene.js', className: 'GameScene', required: true },
+            { src: 'scenes/GameOverScene.js', className: 'GameOverScene', required: true },
+            { src: 'game.js', className: null, required: true } // Das letzte Skript initialisiert das Spiel
+        ];
+        
+        // Einstellungen für Timeouts
+        const scriptLoadTimeout = 10000; // 10 Sekunden Timeout pro Skript
+        let loadingTimeout;
+        
+        // Funktion zum Aktualisieren der Lade-UI
+        function updateLoadingUI(message, isError = false) {
+            const loadingMessage = document.querySelector('.loading-message');
+            if (loadingMessage) {
+                loadingMessage.textContent = message;
+                if (isError) {
+                    loadingMessage.style.color = '#ff5555';
+                }
+            }
+        }
+        
+        function loadScript(scriptInfo) {
+            return new Promise((resolve, reject) => {
+                // Timeout für das Laden des Skripts festlegen
+                const timeout = setTimeout(() => {
+                    reject(new Error(`Timeout loading ${scriptInfo.src} after ${scriptLoadTimeout}ms`));
+                }, scriptLoadTimeout);
+                
+                const script = document.createElement('script');
+                script.src = scriptInfo.src;
+                script.onload = () => {
+                    clearTimeout(timeout);
+                    
+                    // Überprüfe, ob die Klasse nach dem Laden des Skripts verfügbar ist
+                    if (scriptInfo.className && typeof window[scriptInfo.className] === 'undefined') {
+                        const errorMsg = `Class ${scriptInfo.className} not defined in global scope after loading ${scriptInfo.src}`;
+                        console.warn(errorMsg);
+                        
+                        if (scriptInfo.required) {
+                            // For required scripts, we'll try to recover by manually defining a placeholder
+                            if (scriptInfo.className.includes('Scene')) {
+                                // Create minimal scene class
+                                console.log(`Creating placeholder for ${scriptInfo.className}`);
+                                window[scriptInfo.className] = class extends Phaser.Scene {
+                                    constructor() {
+                                        super({ key: scriptInfo.className.replace('Scene', '') });
+                                        console.warn(`Using placeholder for ${scriptInfo.className}`);
+                                    }
+                                    
+                                    create() {
+                                        this.add.text(
+                                            400, 225, 
+                                            `Error: ${scriptInfo.className} failed to load properly`, 
+                                            { fill: '#fff', align: 'center' }
+                                        ).setOrigin(0.5);
+                                        
+                                        // Add button to restart
+                                        const restartBtn = this.add.text(
+                                            400, 300, 
+                                            'Click to Restart', 
+                                            { fill: '#fff', backgroundColor: '#3498db', padding: 10 }
+                                        )
+                                        .setOrigin(0.5)
+                                        .setInteractive();
+                                        
+                                        restartBtn.on('pointerdown', () => {
+                                            window.location.reload();
+                                        });
+                                    }
+                                };
+                            } else if (scriptInfo.className === 'PlaceholderAssets') {
+                                // Create minimal placeholder assets
+                                window.PlaceholderAssets = class PlaceholderAssets {
+                                    static generateAll(scene) {
+                                        console.warn('Using backup PlaceholderAssets');
+                                        // Create basic textures
+                                        const g = scene.make.graphics();
+                                        g.fillStyle(0x3498db);
+                                        g.fillRect(0, 0, 32, 32);
+                                        g.generateTexture('player', 32, 32);
+                                        g.clear();
+                                        g.fillStyle(0x000000);
+                                        g.fillRect(0, 0, 800, 450);
+                                        g.generateTexture('background', 800, 450);
+                                        g.clear();
+                                        g.fillStyle(0x8B4513);
+                                        g.fillRect(0, 0, 64, 32);
+                                        g.generateTexture('ground', 64, 32);
+                                        g.destroy();
+                                    }
+                                };
+                            }
+                        }
+                    } else if (scriptInfo.className) {
+                        console.log(`Class ${scriptInfo.className} successfully loaded from ${scriptInfo.src}`);
+                    }
+                    
+                    resolve();
+                };
+                script.onerror = (event) => {
+                    clearTimeout(timeout);
+                    console.error(`Failed to load ${scriptInfo.src}`, event);
+                    reject(new Error(`Failed to load ${scriptInfo.src}`));
+                };
+                document.body.appendChild(script);
+            });
+        }
+        
+        async function loadAllScripts() {
+            // Globaler Timeout für den gesamten Ladevorgang
+            loadingTimeout = setTimeout(() => {
+                console.error('Loading timed out after 30 seconds');
+                updateLoadingUI('Loading timed out. Please refresh the page.', true);
+            }, 30000); // 30 Sekunden Timeout für den gesamten Ladevorgang
+            
+            const loadedScripts = [];
+            const failedScripts = [];
+            
+            for (let i = 0; i < scripts.length; i++) {
+                try {
+                    // Update loading progress
+                    const progressPercent = Math.floor((i / scripts.length) * 80);
+                    updateLoadingProgress(progressPercent);
+                    updateLoadingUI(`Loading game assets (${i+1}/${scripts.length})...`);
+                    
+                    // Load script
+                    console.log(`Loading script: ${scripts[i].src}`);
+                    await loadScript(scripts[i]);
+                    loadedScripts.push(scripts[i].src);
+                } catch (error) {
+                    console.error(`Error loading script ${scripts[i].src}:`, error);
+                    failedScripts.push({script: scripts[i], error});
+                    
+                    // For required classes, try to create placeholders
+                    if (scripts[i].className && scripts[i].required) {
+                        // Try to create a fallback directly
+                        try {
+                            if (scripts[i].className.includes('Scene') && typeof Phaser !== 'undefined') {
+                                console.log(`Creating fallback for missing scene: ${scripts[i].className}`);
+                                window[scripts[i].className] = class extends Phaser.Scene {
+                                    constructor() {
+                                        super({ key: scripts[i].className.replace('Scene', '') });
+                                    }
+                                    create() {
+                                        this.add.text(400, 225, `Error loading: ${scripts[i].className}`, {
+                                            color: '#ffffff'
+                                        }).setOrigin(0.5);
+                                    }
+                                };
+                            }
+                        } catch (fallbackError) {
+                            console.error(`Failed to create fallback for ${scripts[i].className}:`, fallbackError);
+                        }
+                    }
+                }
+            }
+            
+            // Final loading progress
+            updateLoadingProgress(100);
+            
+            // Clear the global timeout since loading has completed or failed
+            clearTimeout(loadingTimeout);
+            
+            if (failedScripts.length > 0) {
+                console.warn(`${failedScripts.length} script(s) failed to load:`, failedScripts);
+                
+                // Check if any critical scripts failed
+                const criticalFailures = failedScripts.filter(f => f.script.required && !window[f.script.className]);
+                
+                if (criticalFailures.length > 0) {
+                    updateLoadingUI(`Failed to load required game components. Please refresh the page.`, true);
+                    console.error('Critical failures:', criticalFailures);
+                    return;
+                }
+            }
+            
+            // Hide the initial loading UI
+            document.querySelector('.loading-message').style.display = 'none';
+            document.querySelector('.loading-bar-container').style.display = 'none';
+            
+            console.log('All scripts loaded successfully!');
+        }
+        
+        // Start loading scripts
+        loadAllScripts();
+    </script>
+</body>
+</html> 

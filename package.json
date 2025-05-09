@@ -1,0 +1,21 @@
+{
+  "name": "simple-phaser-game",
+  "version": "1.0.0",
+  "description": "A simple 2D game for CrazyGames using Phaser.js",
+  "source": "src/index.html",
+  "scripts": {
+    "start": "npx serve src",
+    "build": "mkdir -p dist && cp -r src/* dist/"
+  },
+  "keywords": [
+    "phaser",
+    "game",
+    "html5",
+    "crazygames"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "phaser": "^3.60.0"
+  }
+} 

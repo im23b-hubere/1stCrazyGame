@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Basic Game Test</title>
+    
+    <!-- Phaser from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        #game-container {
+            width: 800px;
+            height: 450px;
+            background-color: #000;
+        }
+        #console-output {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 150px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            font-family: monospace;
+            padding: 10px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    <div id="console-output"></div>
+    
+    <script>
+        // Debug console setup
+        const consoleOutput = document.getElementById('console-output');
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+        
+        console.log = function() {
+            originalConsoleLog.apply(console, arguments);
+            const line = document.createElement('div');
+            line.textContent = Array.from(arguments).join(' ');
+            consoleOutput.appendChild(line);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        };
+        
+        console.error = function() {
+            originalConsoleError.apply(console, arguments);
+            const line = document.createElement('div');
+            line.style.color = '#ff5555';
+            line.textContent = Array.from(arguments).join(' ');
+            consoleOutput.appendChild(line);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        };
+        
+        // Basic test scene
+        class TestScene extends Phaser.Scene {
+            constructor() {
+                super('TestScene');
+            }
+            
+            preload() {
+                console.log('Preload started');
+                
+                // Create basic assets
+                this.createTestAssets();
+                
+                console.log('Preload complete');
+            }
+            
+            createTestAssets() {
+                // Create a blue rectangle for player
+                const playerGraphics = this.make.graphics();
+                playerGraphics.fillStyle(0x3498db);
+                playerGraphics.fillRect(0, 0, 32, 48);
+                playerGraphics.generateTexture('player', 32, 48);
+                playerGraphics.destroy();
+                
+                // Create a ground platform
+                const groundGraphics = this.make.graphics();
+                groundGraphics.fillStyle(0x8B4513);
+                groundGraphics.fillRect(0, 0, 800, 32);
+                groundGraphics.generateTexture('ground', 800, 32);
+                groundGraphics.destroy();
+                
+                console.log('Test assets created');
+            }
+            
+            create() {
+                console.log('Create started');
+                
+                // Add a background
+                this.add.rectangle(400, 225, 800, 450, 0x87ceeb);
+                
+                // Add the ground
+                const ground = this.physics.add.staticImage(400, 430, 'ground');
+                
+                // Add the player
+                this.player = this.physics.add.sprite(400, 350, 'player');
+                this.player.setBounce(0.2);
+                this.player.setCollideWorldBounds(true);
+                
+                // Set up collision
+                this.physics.add.collider(this.player, ground);
+                
+                // Set up input
+                this.cursors = this.input.keyboard.createCursorKeys();
+                
+                // Add text
+                this.add.text(400, 100, 'Test Scene Running', {
+                    fontSize: '32px',
+                    fill: '#fff'
+                }).setOrigin(0.5);
+                
+                console.log('Create complete');
+            }
+            
+            update() {
+                // Simple player controls
+                if (this.cursors.left.isDown) {
+                    this.player.setVelocityX(-160);
+                } else if (this.cursors.right.isDown) {
+                    this.player.setVelocityX(160);
+                } else {
+                    this.player.setVelocityX(0);
+                }
+                
+                if (this.cursors.up.isDown && this.player.body.touching.down) {
+                    this.player.setVelocityY(-330);
+                }
+            }
+        }
+        
+        // Game configuration
+        const config = {
+            type: Phaser.AUTO,
+            width: 800,
+            height: 450,
+            parent: 'game-container',
+            backgroundColor: '#000000',
+            scene: [TestScene],
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 300 },
+                    debug: false
+                }
+            }
+        };
+        
+        // Start the game
+        console.log('Starting test game...');
+        const game = new Phaser.Game(config);
+    </script>
+</body>
+</html> 

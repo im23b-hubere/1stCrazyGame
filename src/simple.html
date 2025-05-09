@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Test</title>
+    
+    <!-- Phaser from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        #game-container {
+            width: 800px;
+            height: 450px;
+            background-color: #000;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    
+    <script>
+        // Simple game test
+        class SimpleScene extends Phaser.Scene {
+            constructor() {
+                super('SimpleScene');
+            }
+            
+            preload() {
+                // Create a simple logo
+                const graphics = this.make.graphics();
+                graphics.fillStyle(0x3498db);
+                graphics.fillRect(0, 0, 200, 100);
+                graphics.generateTexture('logo', 200, 100);
+                graphics.destroy();
+            }
+            
+            create() {
+                // Background
+                this.add.rectangle(400, 225, 800, 450, 0x87ceeb);
+                
+                // Text
+                this.add.text(400, 225, 'Simple Test Working!', {
+                    fontSize: '32px',
+                    color: '#000',
+                    fontFamily: 'Arial'
+                }).setOrigin(0.5);
+                
+                // Logo
+                this.add.image(400, 100, 'logo');
+            }
+        }
+        
+        // Game config
+        const config = {
+            type: Phaser.AUTO,
+            parent: 'game-container',
+            width: 800,
+            height: 450,
+            backgroundColor: '#000000',
+            scene: [SimpleScene]
+        };
+        
+        // Create game instance
+        new Phaser.Game(config);
+    </script>
+</body>
+</html> 

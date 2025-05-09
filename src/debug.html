@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Simple Runner Game</title>
+    
+    <!-- CrazyGames SDK -->
+    <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
+    
+    <!-- Phaser from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #111;
+            display: flex;
+            flex-direction: column;
+        }
+        #game-container {
+            width: 100%;
+            max-width: 800px;
+            height: auto;
+            aspect-ratio: 16/9;
+            margin: 20px auto;
+        }
+        #console {
+            width: 90%;
+            max-width: 800px;
+            height: 200px;
+            margin: 20px auto;
+            background-color: #222;
+            color: #fff;
+            font-family: monospace;
+            padding: 10px;
+            overflow-y: auto;
+            border: 1px solid #444;
+        }
+        .action-buttons {
+            margin: 10px auto;
+            text-align: center;
+            width: 90%;
+            max-width: 800px;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    
+    <div class="action-buttons">
+        <button id="reload-btn">Reload Game</button>
+        <button id="clear-console-btn">Clear Console</button>
+        <button id="toggle-fps-btn">Toggle FPS</button>
+    </div>
+    
+    <div id="console"></div>
+    
+    <script>
+        // Debug console
+        const consoleDiv = document.getElementById('console');
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+        const originalConsoleWarn = console.warn;
+        
+        console.log = function() {
+            originalConsoleLog.apply(console, arguments);
+            addToConsole('LOG', arguments);
+        };
+        
+        console.error = function() {
+            originalConsoleError.apply(console, arguments);
+            addToConsole('ERROR', arguments);
+        };
+        
+        console.warn = function() {
+            originalConsoleWarn.apply(console, arguments);
+            addToConsole('WARN', arguments);
+        };
+        
+        function addToConsole(type, args) {
+            const line = document.createElement('div');
+            line.style.marginBottom = '5px';
+            
+            if (type === 'ERROR') {
+                line.style.color = '#ff5555';
+            } else if (type === 'WARN') {
+                line.style.color = '#ffcc00';
+            }
+            
+            let text = type + ': ';
+            for (let i = 0; i < args.length; i++) {
+                if (typeof args[i] === 'object') {
+                    try {
+                        text += JSON.stringify(args[i]) + ' ';
+                    } catch (e) {
+                        text += '[Object] ';
+                    }
+                } else {
+                    text += args[i] + ' ';
+                }
+            }
+            
+            line.textContent = text;
+            consoleDiv.appendChild(line);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
+        
+        window.onerror = function(message, source, lineno, colno, error) {
+            addToConsole('ERROR', [`${message} at ${source}:${lineno}:${colno}`]);
+            return false;
+        };
+        
+        // Button actions
+        document.getElementById('reload-btn').addEventListener('click', () => {
+            location.reload();
+        });
+        
+        document.getElementById('clear-console-btn').addEventListener('click', () => {
+            consoleDiv.innerHTML = '';
+        });
+        
+        let fpsEnabled = false;
+        document.getElementById('toggle-fps-btn').addEventListener('click', () => {
+            fpsEnabled = !fpsEnabled;
+            if (window.game) {
+                window.game.config.fps = {
+                    min: 0,
+                    target: 60,
+                    forceSetTimeOut: false,
+                    deltaHistory: 10,
+                    panicMax: 120,
+                    smoothStep: true
+                };
+                window.game.debug.showFPS = fpsEnabled;
+            }
+        });
+    </script>
+    
+    <!-- Game Scripts -->
+    <script>
+        // Create a debug panel with additional information
+        function createDebugPanel() {
+            const debugPanel = document.createElement('div');
+            debugPanel.style.width = '90%';
+            debugPanel.style.maxWidth = '800px';
+            debugPanel.style.margin = '10px auto';
+            debugPanel.style.padding = '10px';
+            debugPanel.style.backgroundColor = '#333';
+            debugPanel.style.border = '1px solid #444';
+            debugPanel.style.borderRadius = '4px';
+            
+            // Add game info
+            const gameInfoHeader = document.createElement('h3');
+            gameInfoHeader.textContent = 'Game Debug Info';
+            gameInfoHeader.style.margin = '0 0 10px 0';
+            gameInfoHeader.style.color = '#fff';
+            debugPanel.appendChild(gameInfoHeader);
+            
+            // Add browser info
+            const browserInfo = document.createElement('div');
+            browserInfo.innerHTML = `
+                <strong>Browser:</strong> ${navigator.userAgent}<br>
+                <strong>Screen:</strong> ${window.innerWidth}x${window.innerHeight}<br>
+                <strong>WebGL:</strong> ${isWebGLSupported() ? 'Supported' : 'Not supported'}<br>
+                <strong>AudioContext:</strong> ${isAudioContextSupported() ? 'Supported' : 'Not supported'}
+            `;
+            browserInfo.style.marginBottom = '10px';
+            browserInfo.style.fontSize = '12px';
+            browserInfo.style.color = '#ccc';
+            debugPanel.appendChild(browserInfo);
+            
+            // Add debug controls
+            const debugControls = document.createElement('div');
+            
+            // Add texture debug button
+            const textureDebugBtn = document.createElement('button');
+            textureDebugBtn.textContent = 'Check Textures';
+            textureDebugBtn.addEventListener('click', checkTextures);
+            debugControls.appendChild(textureDebugBtn);
+            
+            // Add audio debug button
+            const audioDebugBtn = document.createElement('button');
+            audioDebugBtn.textContent = 'Check Audio';
+            audioDebugBtn.addEventListener('click', checkAudio);
+            debugControls.appendChild(audioDebugBtn);
+            
+            // Add scene debug button
+            const sceneDebugBtn = document.createElement('button');
+            sceneDebugBtn.textContent = 'Check Scenes';
+            sceneDebugBtn.addEventListener('click', checkScenes);
+            debugControls.appendChild(sceneDebugBtn);
+            
+            debugPanel.appendChild(debugControls);
+            
+            // Insert after action buttons
+            const actionButtons = document.querySelector('.action-buttons');
+            actionButtons.after(debugPanel);
+        }
+        
+        // Check if WebGL is supported
+        function isWebGLSupported() {
+            try {
+                const canvas = document.createElement('canvas');
+                return !!(window.WebGLRenderingContext && 
+                    (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')));
+            } catch (e) {
+                return false;
+            }
+        }
+        
+        // Check if AudioContext is supported
+        function isAudioContextSupported() {
+            return !!(window.AudioContext || window.webkitAudioContext);
+        }
+        
+        // Check textures
+        function checkTextures() {
+            if (!window.game) {
+                console.log('Game not initialized yet');
+                return;
+            }
+            
+            try {
+                const scene = window.game.scene.getScene('BootScene') || 
+                              window.game.scene.getScene('LoadingScene') ||
+                              window.game.scene.getScene('GameScene');
+                
+                if (!scene) {
+                    console.log('No active scene found');
+                    return;
+                }
+                
+                console.log('--- Texture Check ---');
+                const textures = ['player', 'player-left', 'player-right', 'ground', 'background'];
+                textures.forEach(key => {
+                    console.log(`Texture '${key}': ${scene.textures.exists(key) ? 'Available' : 'Missing'}`);
+                });
+            } catch (e) {
+                console.error('Error checking textures:', e);
+            }
+        }
+        
+        // Check audio
+        function checkAudio() {
+            if (!window.game) {
+                console.log('Game not initialized yet');
+                return;
+            }
+            
+            try {
+                const scene = window.game.scene.getScene('BootScene') || 
+                              window.game.scene.getScene('LoadingScene') ||
+                              window.game.scene.getScene('GameScene');
+                
+                if (!scene) {
+                    console.log('No active scene found');
+                    return;
+                }
+                
+                console.log('--- Audio Check ---');
+                const sounds = ['jump', 'collect', 'hit', 'music'];
+                sounds.forEach(key => {
+                    console.log(`Sound '${key}': ${scene.cache.audio.exists(key) ? 'Available' : 'Missing'}`);
+                });
+            } catch (e) {
+                console.error('Error checking audio:', e);
+            }
+        }
+        
+        // Check scenes
+        function checkScenes() {
+            if (!window.game) {
+                console.log('Game not initialized yet');
+                return;
+            }
+            
+            console.log('--- Scene Check ---');
+            const scenes = ['BootScene', 'LoadingScene', 'MainMenuScene', 'GameScene', 'GameOverScene'];
+            
+            scenes.forEach(sceneName => {
+                try {
+                    const scene = window.game.scene.getScene(sceneName);
+                    console.log(`Scene '${sceneName}': ${scene ? 'Available' : 'Missing'}`);
+                } catch (e) {
+                    console.log(`Scene '${sceneName}': Error - ${e.message}`);
+                }
+            });
+            
+            console.log('Active scene:', window.game.scene.isActive);
+        }
+        
+        // Add timestamp to script URLs to force reload (for debugging)
+        const timestamp = new Date().getTime();
+        const scripts = [
+            { src: 'assets/placeholder.js', className: 'PlaceholderAssets' },
+            { src: 'scenes/BootScene.js', className: 'BootScene' },
+            { src: 'scenes/LoadingScene.js', className: 'LoadingScene' },
+            { src: 'scenes/MainMenuScene.js', className: 'MainMenuScene' },
+            { src: 'scenes/GameScene.js', className: 'GameScene' },
+            { src: 'scenes/GameOverScene.js', className: 'GameOverScene' },
+            { src: 'game.js', className: null } // Das letzte Skript initialisiert das Spiel
+        ];
+        
+        function loadScript(scriptInfo) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = scriptInfo.src + '?v=' + timestamp;
+                script.onload = () => {
+                    if (scriptInfo.className && typeof window[scriptInfo.className] === 'undefined') {
+                        console.warn(`Class ${scriptInfo.className} not defined in global scope after loading ${scriptInfo.src}`);
+                    }
+                    resolve();
+                };
+                script.onerror = () => reject(new Error(`Script load error for ${scriptInfo.src}`));
+                document.body.appendChild(script);
+            });
+        }
+        
+        // Load all scripts in sequence
+        async function loadAllScripts() {
+            try {
+                console.log('Loading game scripts...');
+                
+                for (const scriptInfo of scripts) {
+                    await loadScript(scriptInfo);
+                    console.log(`Loaded: ${scriptInfo.src}`);
+                }
+                
+                // Prüfe, ob alle erforderlichen Klassen geladen wurden
+                const requiredClasses = scripts.filter(s => s.className).map(s => s.className);
+                const missingClasses = requiredClasses.filter(className => typeof window[className] === 'undefined');
+                
+                if (missingClasses.length > 0) {
+                    console.error(`Missing required classes: ${missingClasses.join(', ')}`);
+                } else {
+                    console.log('All scripts and classes loaded successfully');
+                }
+                
+                // Create debug panel after scripts are loaded
+                setTimeout(createDebugPanel, 1000);
+            } catch (error) {
+                console.error('Error loading scripts:', error);
+            }
+        }
+        
+        // Start loading scripts
+        loadAllScripts();
+    </script>
+    
+    <!-- Add diagnostic panel -->
+    <script>
+        // Add diagnostic panel
+        function createDiagnosticPanel() {
+            const diagnosticPanel = document.createElement('div');
+            diagnosticPanel.id = 'diagnostic-panel';
+            diagnosticPanel.style.cssText = `
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                width: 300px;
+                max-height: 400px;
+                overflow-y: auto;
+                background: rgba(0, 0, 0, 0.7);
+                color: #fff;
+                font-family: monospace;
+                padding: 10px;
+                font-size: 12px;
+                border-radius: 5px;
+                z-index: 1000;
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            `;
+            document.body.appendChild(diagnosticPanel);
+            
+            // Add a toggle button
+            const toggleButton = document.createElement('button');
+            toggleButton.innerText = 'Hide Diagnostics';
+            toggleButton.style.cssText = `
+                position: fixed;
+                top: 10px;
+                right: 320px;
+                background: #3498db;
+                color: white;
+                border: none;
+                padding: 5px 10px;
+                border-radius: 3px;
+                cursor: pointer;
+                z-index: 1000;
+            `;
+            document.body.appendChild(toggleButton);
+            
+            toggleButton.addEventListener('click', function() {
+                if (diagnosticPanel.style.display === 'none') {
+                    diagnosticPanel.style.display = 'block';
+                    toggleButton.innerText = 'Hide Diagnostics';
+                } else {
+                    diagnosticPanel.style.display = 'none';
+                    toggleButton.innerText = 'Show Diagnostics';
+                }
+            });
+            
+            return diagnosticPanel;
+        }
+        
+        function updateDiagnostics() {
+            let diagnosticPanel = document.getElementById('diagnostic-panel');
+            if (!diagnosticPanel) {
+                diagnosticPanel = createDiagnosticPanel();
+            }
+            
+            const getGameInfo = () => {
+                if (!window.game) return 'Game not initialized';
+                
+                const game = window.game;
+                let info = `Phaser v${Phaser.VERSION}\n`;
+                info += `FPS: ${Math.round(game.loop.actualFps)}\n`;
+                info += `Scenes:\n`;
+                
+                // Get all scenes and their status
+                game.scene.scenes.forEach(scene => {
+                    info += `  - ${scene.sys.settings.key}: ${scene.sys.settings.active ? 'active' : 'inactive'}\n`;
+                });
+                
+                // Get active textures
+                info += `\nTextures loaded: ${Object.keys(game.textures.list).length}\n`;
+                
+                // Get audio
+                info += `\nAudio entries: ${game.cache.audio.entries.size}\n`;
+                
+                // Get audio context state
+                const context = game.sound?.context;
+                if (context) {
+                    info += `Audio context state: ${context.state}\n`;
+                } else {
+                    info += `Audio context: not available\n`;
+                }
+                
+                return info;
+            };
+            
+            // Check audio context permission
+            const getAudioPermissionInfo = () => {
+                if (typeof navigator.permissions === 'undefined') return 'Permissions API not available';
+                
+                let info = 'Audio permission: ';
+                try {
+                    navigator.permissions.query({ name: 'microphone' })
+                    .then(permissionStatus => {
+                        info += permissionStatus.state;
+                        diagnosticPanel.innerHTML = getDiagnosticInfo();
+                    })
+                    .catch(error => {
+                        info += `error (${error.message})`;
+                        diagnosticPanel.innerHTML = getDiagnosticInfo();
+                    });
+                } catch (e) {
+                    info += `API error (${e.message})`;
+                }
+                return info + ' (checking...)';
+            };
+            
+            // Class availability
+            const getClassAvailability = () => {
+                const classes = [
+                    'PlaceholderAssets', 
+                    'BootScene', 
+                    'LoadingScene', 
+                    'MainMenuScene', 
+                    'GameScene', 
+                    'GameOverScene'
+                ];
+                
+                let info = '\nClass availability:\n';
+                classes.forEach(cls => {
+                    info += `  - ${cls}: ${typeof window[cls] !== 'undefined' ? 'available' : 'missing'}\n`;
+                });
+                
+                return info;
+            };
+            
+            // Browser info
+            const getBrowserInfo = () => {
+                return `\nBrowser: ${navigator.userAgent}\n`;
+            };
+            
+            // Get error count
+            const errorCount = window.gameErrors || 0;
+            
+            const getDiagnosticInfo = () => {
+                return `--- DIAGNOSTICS ---\n` +
+                       `Time: ${new Date().toLocaleTimeString()}\n` +
+                       `Errors detected: ${errorCount}\n` +
+                       getGameInfo() +
+                       getClassAvailability() +
+                       getAudioPermissionInfo() +
+                       getBrowserInfo();
+            };
+            
+            diagnosticPanel.innerHTML = getDiagnosticInfo();
+        }
+        
+        // Track error count
+        window.gameErrors = 0;
+        window.addEventListener('error', function(e) {
+            window.gameErrors = (window.gameErrors || 0) + 1;
+        });
+        
+        // Update diagnostics every second
+        setInterval(updateDiagnostics, 1000);
+        
+        // Add manual audio unlock button
+        function addAudioUnlockButton() {
+            const unlockButton = document.createElement('button');
+            unlockButton.innerText = 'Unlock Audio';
+            unlockButton.style.cssText = `
+                position: fixed;
+                top: 10px;
+                left: 10px;
+                background: #e74c3c;
+                color: white;
+                border: none;
+                padding: 5px 10px;
+                border-radius: 3px;
+                cursor: pointer;
+                z-index: 1000;
+            `;
+            document.body.appendChild(unlockButton);
+            
+            unlockButton.addEventListener('click', function() {
+                // Try to unlock audio context
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (AudioContext) {
+                    try {
+                        const audioContext = new AudioContext();
+                        const buffer = audioContext.createBuffer(1, 1, 22050);
+                        const source = audioContext.createBufferSource();
+                        source.buffer = buffer;
+                        source.connect(audioContext.destination);
+                        if (source.start) {
+                            source.start(0);
+                        } else {
+                            source.noteOn(0);
+                        }
+                        unlockButton.innerText = 'Audio Unlocked';
+                        unlockButton.style.background = '#27ae60';
+                        
+                        // Also try to resume game audio context if available
+                        if (window.game && window.game.sound && window.game.sound.context) {
+                            window.game.sound.context.resume().then(() => {
+                                console.log('Game audio context resumed successfully');
+                            }).catch(e => {
+                                console.error('Failed to resume game audio context:', e);
+                            });
+                        }
+                    } catch (e) {
+                        console.error('Error unlocking audio:', e);
+                        unlockButton.innerText = 'Unlock Failed';
+                    }
+                }
+            });
+        }
+        
+        // Initialize diagnostic tools when the page loads
+        window.addEventListener('load', function() {
+            updateDiagnostics();
+            addAudioUnlockButton();
+        });
+    </script>
+</body>
+</html> 
